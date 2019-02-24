@@ -30,7 +30,7 @@ Lynput.s_reservedNames = {
   "return", "then", "true", "until", "while",
   -- Reserved by Lynput
   "inputsSet", "gpad", "gpadDeadZone", "id", "remove", "attachGamepad",
-  "bind", "unbind", "unbindAll", "removeAction", "update"
+  "bind", "rebind", "unbind", "unbindAll", "removeAction", "update"
 }
 
 Lynput.s_reservedCharacters = {
@@ -72,6 +72,9 @@ function Lynput.new()
   local self = setmetatable({}, Lynput)
   -- Maps Lynput inputs and states to actions, inputsSet[state][action]
   self.inputsSet = {}
+
+  -- List of actions awaiting new bind
+  self.rebinds = {}
 
   self.gpad = nil
   -- TODO: Different deadzones for joysticks and triggers
@@ -426,61 +429,53 @@ function Lynput:update(dt)
   end -- if the gamepad has been added
 end
 
+local function checkRebind(lynput, input, method)
+  for _,actionToBind in pairs(lynput.rebinds) do
+    for inputAction, actions in pairs(lynput.inputsSet) do
+      for actionType, action in pairs(actions) do
+        if(actionToBind == action) then
+          lynput:unbindAll(action)
+          lynput:bind(ation, input)
+          return
+        end
+      end
+    end
+  end
+end
+
+local function setInputState(lynput, input, inputAction, desiredState)
+  if lynput.inputsSet[input] then
+      if lynput.inputsSet[input][inputAction] then
+        local action = lynput.inputsSet[input][inputAction]
+        lynput[action] = desiredState
+      end -- if inputAction input (e.g. press_key) is set
+    end -- if input set
+end
 
 ---------------------------------
 -- KEYBOARD CALLBACKS
 ---------------------------------
 function Lynput.onkeypressed(key)
   for _, lynput in pairs(Lynput.s_lynputs) do
-    if lynput.inputsSet["any"] then
-      if lynput.inputsSet["any"]["press"] then
-	local action = lynput.inputsSet["any"]["press"]
-	lynput[action] = true
-      end -- if press_any is set
-      if lynput.inputsSet["any"]["hold"] then
-	local action = lynput.inputsSet["any"]["hold"]
-	lynput[action] = true
-      end -- if hold_any is set
-    end -- if "any" is set
+    checkRebind(lynput, key, 'keyboard')
 
-    if lynput.inputsSet[key] then
-      if lynput.inputsSet[key]["press"] then
-	local action = lynput.inputsSet[key]["press"]
-	lynput[action] = true
-      end -- if press_key is set
-      if lynput.inputsSet[key]["hold"] then
-	local action = lynput.inputsSet[key]["hold"]
-	lynput[action] = true
-      end -- if hold_key is set      
-    end -- if key set
+    setInputState(lynput, 'any', 'press', true)
+    setInputState(lynput, 'any', 'hold', true)
+
+    setInputState(lynput, key, 'press', true)
+    setInputState(lynput, key, 'hold', true)
   end -- for each lynput
 end
 
 
 function Lynput.onkeyreleased(key)
   for _, lynput in pairs(Lynput.s_lynputs) do
-    if lynput.inputsSet["any"] then
-      if lynput.inputsSet["any"]["release"] then
-	local action = lynput.inputsSet["any"]["release"]
-	lynput[action] = true
-      end -- if release_any is set
-      if lynput.inputsSet["any"]["hold"] then
-	local action = lynput.inputsSet["any"]["hold"]
-	lynput[action] = false
-      end -- if hold_any is set
-    end -- if "any" is set
-    
-    if lynput.inputsSet[key] then
-      if lynput.inputsSet[key]["release"] then
-	local action = lynput.inputsSet[key]["release"]
-	lynput[action] = true
-      end -- if release_key is set
-      if lynput.inputsSet[key]["hold"] then
-	local action = lynput.inputsSet[key]["hold"]
-	lynput[action] = false
-      end -- if hold_key is set
-    end -- if key is set
-  end -- for each lynput
+    setInputState(lynput, 'any', 'release', true)
+    setInputState(lynput, 'any', 'hold', false)
+
+    setInputState(lynput, key, 'release', true)
+    setInputState(lynput, key, 'hold', false)
+  end
 end
 
 
@@ -492,27 +487,13 @@ function Lynput.onmousepressed(button)
   button = Lynput.s_mouseButtons[tostring(button)]
   -- Process button
   for _, lynput in pairs(Lynput.s_lynputs) do
-    if lynput.inputsSet["any"] then
-      if lynput.inputsSet["any"]["press"] then
-	local action = lynput.inputsSet["any"]["press"]
-	lynput[action] = true
-      end -- if press_any is set
-      if lynput.inputsSet["any"]["hold"] then
-	local action = lynput.inputsSet["any"]["hold"]
-	lynput[action] = true
-      end -- if hold_any is set
-    end -- if "any" is set
-    
-    if lynput.inputsSet[button] then
-      if lynput.inputsSet[button]["press"] then
-	local action = lynput.inputsSet[button]["press"]
-	lynput[action] = true
-      end -- if press_button is set
-      if lynput.inputsSet[button]["hold"] then
-	local action = lynput.inputsSet[button]["hold"]
-	lynput[action] = true
-      end -- if hold_button is set
-    end -- if button is set
+    checkRebind(lynput, key, 'mouse')
+
+    setInputState(lynput, 'any', 'press', true)
+    setInputState(lynput, 'any', 'hold', true)
+
+    setInputState(lynput, button, 'press', true)
+    setInputState(lynput, button, 'hold', true)
   end -- for each lynput
 end
 
@@ -522,27 +503,11 @@ function Lynput.onmousereleased(button)
   button = Lynput.s_mouseButtons[tostring(button)]
   -- Process button
   for _, lynput in pairs(Lynput.s_lynputs) do
-    if lynput.inputsSet["any"] then
-      if lynput.inputsSet["any"]["release"] then
-	local action = lynput.inputsSet["any"]["release"]
-	lynput[action] = true
-      end -- if release_any is set
-      if lynput.inputsSet["any"]["hold"] then
-	local action = lynput.inputsSet["any"]["hold"]
-	lynput[action] = false
-      end -- if hold_any is set
-    end -- if "any" is set
-    
-    if lynput.inputsSet[button] then
-      if lynput.inputsSet[button]["release"] then
-	local action = lynput.inputsSet[button]["release"]
-	lynput[action] = true
-      end -- if press_button is set
-      if lynput.inputsSet[button]["hold"] then
-	local action = lynput.inputsSet[button]["hold"]
-	lynput[action] = false
-      end -- if hold_button is set
-    end -- if button is set
+    setInputState(lynput, 'any', 'release', true)
+    setInputState(lynput, 'any', 'hold', false)
+
+    setInputState(lynput, button, 'release', true)
+    setInputState(lynput, button, 'hold', false)
   end -- for each lynput
 end
 
@@ -557,28 +522,13 @@ function Lynput.ongamepadpressed(gamepadID, button)
   for _, lynput in pairs(Lynput.s_lynputs) do
     if lynput.gpad then
       if Lynput[lynput.gpad]:getID() == gamepadID then
-	if lynput.inputsSet["any"] then
-	  if lynput.inputsSet["any"]["press"] then
-	    local action = lynput.inputsSet["any"]["press"]
-	    lynput[action] = true
-	  end -- if press_any is set
-	  if lynput.inputsSet["any"]["hold"] then
-	    local action = lynput.inputsSet["any"]["hold"]
-	    lynput[action] = true
-	  end -- if hold_any is set
-	end -- if "any" is set
+        checkRebind(lynput, key, 'gamepad')
 
-	
-	if lynput.inputsSet[button] then
-	  if lynput.inputsSet[button]["press"] then
-	    local action = lynput.inputsSet[button]["press"]
-	    lynput[action] = true
-	  end -- if press_button is set
-	  if lynput.inputsSet[button]["hold"] then
-	    local action = lynput.inputsSet[button]["hold"]
-	    lynput[action] = true
-	  end -- if hold_button is set
-	end -- if button is set
+        setInputState(lynput, 'any', 'press', true)
+        setInputState(lynput, 'any', 'hold', true)
+
+        setInputState(lynput, button, 'press', true)
+        setInputState(lynput, button, 'hold', true)
       end -- if gamepad is set
     end -- if lynput has a gamepad attached
   end -- for each lynput
@@ -592,27 +542,11 @@ function Lynput.ongamepadreleased(gamepadID, button)
   for _, lynput in pairs(Lynput.s_lynputs) do
     if lynput.gpad then
       if Lynput[lynput.gpad]:getID() == gamepadID then
-	if lynput.inputsSet["any"] then
-	  if lynput.inputsSet["any"]["release"] then
-	    local action = lynput.inputsSet["any"]["release"]
-	    lynput[action] = true
-	  end -- if release_any is set
-	  if lynput.inputsSet["any"]["hold"] then
-	    local action = lynput.inputsSet["any"]["hold"]
-	    lynput[action] = false
-	  end -- if hold_any is set
-	end -- if "any" is set
-	
-	if lynput.inputsSet[button] then
-	  if lynput.inputsSet[button]["release"] then
-	    local action = lynput.inputsSet[button]["release"]
-	    lynput[action] = true
-	  end -- if release_button is set
-	  if lynput.inputsSet[button]["hold"] then
-	    local action = lynput.inputsSet[button]["hold"]
-	    lynput[action] = false
-	  end -- if hold_button is set
-	end -- if button is set
+        setInputState(lynput, 'any', 'release', true)
+        setInputState(lynput, 'any', 'hold', false)
+
+        setInputState(lynput, button, 'release', true)
+        setInputState(lynput, button, 'hold', false)
       end -- if gamepad is set
     end -- if lynput has a gamepad attached
   end -- for each lynput
