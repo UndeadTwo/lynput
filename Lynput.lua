@@ -291,6 +291,16 @@ function Lynput:bind(action, commands)
   end -- for each command
 end
 
+function Lynput:rebind(action)
+  -- Type checking for argument #1
+  assert(
+    type(action) == "string",
+    "bad argument #1 to 'Lynput:rebind' (string expected, got " .. type(action) .. ")" ..
+      "\nCheck the stack traceback to know where the invalid arguments have been passed"
+  )
+
+  table.insert(self.rebinds, action)
+end
 
 function Lynput:unbind(action, commands)
   -- Type checking for argument #1
@@ -429,17 +439,23 @@ function Lynput:update(dt)
   end -- if the gamepad has been added
 end
 
-local function checkRebind(lynput, input, method)
-  for _,actionToBind in pairs(lynput.rebinds) do
+local function checkRebind(lynput, input)
+  local reboundIndexesToRemove = {}
+  for actionIndex,actionToBind in pairs(lynput.rebinds) do
     for inputAction, actions in pairs(lynput.inputsSet) do
       for actionType, action in pairs(actions) do
         if(actionToBind == action) then
-          lynput:unbindAll(action)
-          lynput:bind(ation, input)
+          table.insert(reboundIndexesToRemove, actionIndex)
+          lynput:unbindAll(actionToBind)
+          lynput:bind(actionToBind, actionType .. ' ' .. input)
           return
         end
       end
     end
+  end
+
+  for _, index in pairs(reboundIndexesToRemove) do
+    table.remove(lynput.rebinds, index)
   end
 end
 
@@ -457,7 +473,7 @@ end
 ---------------------------------
 function Lynput.onkeypressed(key)
   for _, lynput in pairs(Lynput.s_lynputs) do
-    checkRebind(lynput, key, 'keyboard')
+    checkRebind(lynput, key)
 
     setInputState(lynput, 'any', 'press', true)
     setInputState(lynput, 'any', 'hold', true)
@@ -487,7 +503,7 @@ function Lynput.onmousepressed(button)
   button = Lynput.s_mouseButtons[tostring(button)]
   -- Process button
   for _, lynput in pairs(Lynput.s_lynputs) do
-    checkRebind(lynput, key, 'mouse')
+    checkRebind(lynput, button)
 
     setInputState(lynput, 'any', 'press', true)
     setInputState(lynput, 'any', 'hold', true)
@@ -522,7 +538,7 @@ function Lynput.ongamepadpressed(gamepadID, button)
   for _, lynput in pairs(Lynput.s_lynputs) do
     if lynput.gpad then
       if Lynput[lynput.gpad]:getID() == gamepadID then
-        checkRebind(lynput, key, 'gamepad')
+        checkRebind(lynput, button)
 
         setInputState(lynput, 'any', 'press', true)
         setInputState(lynput, 'any', 'hold', true)
